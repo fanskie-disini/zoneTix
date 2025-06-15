@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { getEventBySlug } from "@/utils/fetchEvents";
 import CheckoutModal from "@/components/CheckoutModal";
 
-
 export default function EventDetail() {
   const { slug } = useParams();
   const router = useRouter();
@@ -125,16 +124,16 @@ export default function EventDetail() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleQtyChange(ticket.id, "dec")}
-                      className="px-3 py-1 bg-[#D5E7B5] text-[#474E93] rounded"
+                      className="px-3 py-1 bg-[#D5E7B5] text-[#474E93] rounded hover:bg-[#c4d9a8] transition-colors"
                     >
                       −
                     </button>
-                    <span className="min-w-[20px] text-center text-[#474E93]">
+                    <span className="min-w-[20px] text-center text-[#474E93] font-medium">
                       {ticketCounts[ticket.id] || 0}
                     </span>
                     <button
                       onClick={() => handleQtyChange(ticket.id, "inc")}
-                      className="px-3 py-1 bg-[#72BAA9] text-white rounded"
+                      className="px-3 py-1 bg-[#72BAA9] text-white rounded hover:bg-[#5fa094] transition-colors"
                     >
                       +
                     </button>
@@ -153,9 +152,9 @@ export default function EventDetail() {
             <button
               disabled={total === 0}
               onClick={() => setShowModal(true)}
-              className="mt-4 w-full py-2 bg-[#474E93] text-white rounded hover:bg-[#3c417d] disabled:bg-gray-300"
+              className="mt-4 w-full py-3 bg-gradient-to-r from-[#474E93] to-[#7E5CAD] text-white rounded-xl font-semibold hover:from-[#3c417d] hover:to-[#6b4d96] disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all duration-300 shadow-lg"
             >
-              Pesan Sekarang
+              {total === 0 ? "Pilih Tiket Terlebih Dahulu" : "Pesan Sekarang"}
             </button>
           </div>
         </section>
@@ -184,8 +183,10 @@ export default function EventDetail() {
       <CheckoutModal
         show={showModal}
         onClose={() => setShowModal(false)}
-        user={dummyUser} // boleh dummy sementara
+        user={dummyUser}
         total={total}
+        event={event}
+        ticketCounts={ticketCounts}
       />
     </main>
   );
