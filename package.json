@@ -1,0 +1,19 @@
+{
+  "name": "ticketing-platform-monorepo",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend-api": "pnpm --filter backend-api dev",
+    "dev:frontend-app": "pnpm --filter frontend-app dev",
+    "dev:frontend-admin": "pnpm --filter frontend-admin dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  }
+}
