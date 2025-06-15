@@ -1,0 +1,41 @@
+{
+  "name": "frontend-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@sendinblue/client": "^3.3.1",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/auth-helpers-react": "^0.5.0",
+    "@supabase/supabase-js": "^2.49.4",
+    "axios": "^1.9.0",
+    "bcryptjs": "^3.0.2",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.12.1",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.511.0",
+    "nanoid": "^5.1.5",
+    "next": "15.3.2",
+    "react": "^19.0.0",
+    "react-date-range": "^2.0.1",
+    "react-datepicker": "^8.3.0",
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2",
+    "react-icons": "^5.5.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@svgr/webpack": "^8.1.0",
+    "@tailwindcss/postcss": "^4.1.7",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.2",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.7"
+  }
+}

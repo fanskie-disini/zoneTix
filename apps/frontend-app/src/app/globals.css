@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Misal di global.css atau tailwind layer */
+.rdrCalendarWrapper {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
