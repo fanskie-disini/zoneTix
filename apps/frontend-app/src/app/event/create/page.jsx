@@ -278,7 +278,7 @@ function CreateEventContent() {
         <div>
           <h2 className="text-xl font-bold text-[#474E93] dark:text-[#D5E7B5]">Punya acara seru?</h2>
           <p className="text-gray-700 dark:text-gray-300">
-            Yuk, daftarkan eventmu sekarang dan biarkan semua orang tahu betapa serunya acara kamu!
+            Yuk, daftarkan eventmu sekarang juga dan biarkan semua orang tahu betapa serunya acara kamu!
           </p>
         </div>
       </div>
