@@ -187,6 +187,8 @@ const ProfilePage = () => {
     </div>
   ));
 
+  ProfileField.displayName = "ProfileField";
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center pt-24 bg-gray-50 dark:bg-gray-900">
@@ -481,7 +483,5 @@ const ProfilePage = () => {
     </div>
   );
 };
-
-ProfilePage.displayName = "ProfilePage";
 
 export default ProfilePage;
