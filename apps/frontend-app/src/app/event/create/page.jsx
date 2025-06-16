@@ -1,4 +1,4 @@
-// event/create/page.jsx - Update bagian handleSubmit
+// event/create/page.jsx
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -19,20 +19,9 @@ function CreateEventContent() {
   const [description, setDescription] = useState("");
   const [dateType, setDateType] = useState("text");
   const [searchTimeout, setSearchTimeout] = useState(null);
-  const [userId, setUserId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const dateRef = useRef(null);
   const [resetKey, setResetKey] = useState(0);
-
-  // Get user ID from auth
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUserId(session.user.id);
-      }
-    };
-    getUser();
-  }, []);
 
   const handleAddTicket = () => {
     setTickets([...tickets, { name: "", price: "" }]);
@@ -156,72 +145,114 @@ function CreateEventContent() {
     }, 200);
   };
 
-  // UPDATED handleSubmit - Kirim ke event_pending
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
-    if (!userId) {
-      alert("Anda harus login terlebih dahulu.");
-      return;
-    }
+    
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    const parsedTickets = tickets.map((ticket) => ({
-      name: ticket.name.trim(),
-      price: parseInt(ticket.price, 10) || 0,
-    }));
-  
-    let uploadedImageUrl = "";
-  
-    if (imageFile) {
-      if (imageFile.size > 5 * 1024 * 1024) {
-        alert("Ukuran gambar maksimal 5MB. Silakan unggah gambar yang lebih kecil.");
-        return;
-      }      
-
-      const fileExt = imageFile.name.split(".").pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `events/${fileName}`;
-  
-      const { data, error } = await supabase.storage
-        .from("event-images")
-        .upload(filePath, imageFile);
-  
-      if (error) {
-        console.error("Upload error:", error.message);
-        alert("Gagal upload gambar.");
+    try {
+      // Validate and parse tickets
+      const validTickets = tickets.filter(ticket => ticket.name.trim() && ticket.price);
+      if (validTickets.length === 0) {
+        alert("Minimal harus ada satu tiket yang valid.");
         return;
       }
-  
-      // Get public URL
-      const publicUrlResponse = supabase.storage
-        .from("event-images")
-        .getPublicUrl(filePath);
 
-      uploadedImageUrl = publicUrlResponse.data?.publicUrl || "";
-    }
-  
-    const payload = {
-      title: e.target.title.value,
-      location,
-      date: dateRef.current.value,
-      imageUrl: uploadedImageUrl,
-      description,
-      tickets: parsedTickets,
-      organizer_id: userId
-    };
-  
-    try {
-      // PERUBAHAN: Kirim ke events-pending API (di frontend-admin)
-      const res = await fetch("http://localhost:3000/api/events-pending", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-  
-      if (!res.ok) throw new Error("Gagal menyimpan event.");
-  
-      const result = await res.json();
-      alert("Event berhasil dikirim untuk review! Silakan tunggu persetujuan admin.");
+      const parsedTickets = validTickets.map((ticket) => ({
+        name: ticket.name.trim(),
+        price: parseInt(ticket.price.toString().replace(/\D/g, ""), 10) || 0,
+      }));
+
+      let uploadedImageUrl = "";
+
+      // Handle image upload
+      if (imageFile) {
+        if (imageFile.size > 5 * 1024 * 1024) {
+          alert("Ukuran gambar maksimal 5MB. Silakan unggah gambar yang lebih kecil.");
+          return;
+        }
+
+        const fileExt = imageFile.name.split(".").pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `events/${fileName}`;
+
+        const { data, error } = await supabase.storage
+          .from("event-images")
+          .upload(filePath, imageFile);
+
+        if (error) {
+          console.error("Upload error:", error.message);
+          alert("Gagal upload gambar: " + error.message);
+          return;
+        }
+
+        // Get public URL
+        const publicUrlResponse = supabase.storage
+          .from("event-images")
+          .getPublicUrl(filePath);
+
+        uploadedImageUrl = publicUrlResponse.data?.publicUrl || "";
+      }
+
+      // Prepare payload matching your database schema
+      const payload = {
+        title: e.target.title.value.trim(),
+        location: location.trim(),
+        date: dateRef.current.value,
+        image_url: uploadedImageUrl, // Note: using image_url to match your schema
+        description: description.trim(),
+        tickets: parsedTickets,
+      };
+
+      console.log("Payload being sent:", payload);
+
+      // Try multiple API endpoint possibilities
+      const possibleEndpoints = [
+        "/api/events",
+        "/api/event",
+        "http://localhost:3000/api/events",
+        "http://localhost:3000/api/event"
+      ];
+
+      let response = null;
+      let lastError = null;
+
+      for (const endpoint of possibleEndpoints) {
+        try {
+          console.log(`Trying endpoint: ${endpoint}`);
+          response = await fetch(endpoint, {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (response.ok) {
+            console.log(`Success with endpoint: ${endpoint}`);
+            break;
+          } else {
+            const errorText = await response.text();
+            console.log(`Failed with ${endpoint}:`, response.status, errorText);
+            lastError = `${response.status}: ${errorText}`;
+          }
+        } catch (err) {
+          console.log(`Error with ${endpoint}:`, err.message);
+          lastError = err.message;
+          continue;
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(lastError || "Semua endpoint API gagal");
+      }
+
+      const result = await response.json();
+      console.log("Success result:", result);
+      
+      alert("Event berhasil disimpan!");
       
       // Reset form
       e.target.reset();
@@ -230,9 +261,12 @@ function CreateEventContent() {
       setDescription("");
       setImageFile(null);
       setResetKey(prev => prev + 1);
+
     } catch (err) {
-      console.error(err);
-      alert("Gagal menyimpan event.");
+      console.error("Submit error:", err);
+      alert(`Gagal menyimpan event: ${err.message}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -247,7 +281,7 @@ function CreateEventContent() {
         <div>
           <h2 className="text-xl font-bold text-[#474E93] dark:text-[#D5E7B5]">Punya acara seru?</h2>
           <p className="text-gray-700 dark:text-gray-300">
-            Event Anda akan direview oleh admin terlebih dahulu sebelum dipublikasikan!
+            Yuk, daftarkan eventmu sekarang dan biarkan semua orang tahu betapa serunya acara kamu!
           </p>
         </div>
       </div>
@@ -400,9 +434,10 @@ function CreateEventContent() {
         {/* Submit */}
         <button
           type="submit"
-          className="bg-[#474E93] hover:bg-[#372f80] text-white font-semibold px-6 py-2 rounded transition dark:bg-[#72BAA9] dark:hover:bg-[#5da594]"
+          disabled={isSubmitting}
+          className="bg-[#474E93] hover:bg-[#372f80] text-white font-semibold px-6 py-2 rounded transition dark:bg-[#72BAA9] dark:hover:bg-[#5da594] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Kirim untuk Review
+          {isSubmitting ? "Menyimpan..." : "Simpan Event"}
         </button>
       </form>
     </div>

@@ -11,6 +11,7 @@ import {
   Download,
   Mail,
   ExternalLink,
+  AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { toast } from "react-hot-toast";
@@ -25,6 +26,7 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
   const [eTicketId] = useState(`TKT-${Date.now()}`);
   const [isProcessingPDF, setIsProcessingPDF] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
+  const [isEmailSending, setIsEmailSending] = useState(false);
 
   // Generate selected tickets
   const selectedTickets =
@@ -79,6 +81,14 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
     setCurrentStep("payment");
   };
 
+  const handleLoginOrPay = () => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+    setCurrentStep("payment");
+  };
+
   const handlePaymentComplete = () => {
     setCurrentStep("success");
     // Auto send email after payment success
@@ -89,6 +99,7 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
     setCurrentStep("detail");
     setPaymentCountdown(600);
     setIsEmailSent(false);
+    setIsEmailSending(false);
     onClose();
   };
 
@@ -137,28 +148,64 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
     }
   };
 
-  // Send email ticket
+  // Send email ticket - FIXED VERSION
   const handleSendEmailTicket = async () => {
     if (!user?.email) {
       toast.error("Email tidak tersedia");
       return;
     }
 
+    if (isEmailSending) {
+      return; // Prevent multiple calls
+    }
+
+    setIsEmailSending(true);
+
     try {
-      // Simulate email sending - replace with actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const ticketData = {
+        orderId,
+        eTicketId,
+        event: {
+          id: event.id,
+          title: event.title,
+          date: event.date,
+          location: event.location,
+        },
+        user: {
+          name: getUserFullName(),
+          email: user.email,
+          phone: getUserPhone(),
+        },
+        tickets: selectedTickets,
+        total,
+        purchaseDate: new Date().toISOString(),
+      };
 
-      // In real implementation, call your email API:
-      // await sendTicketEmail({
-      //   to: user.email,
-      //   ticketData: { orderId, eTicketId, event, user, tickets: selectedTickets, total }
-      // });
+      const response = await fetch("/api/send-ticket", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(ticketData),
+      });
 
-      setIsEmailSent(true);
-      toast.success(`E-ticket berhasil dikirim ke ${user.email}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Gagal mengirim email");
+      }
+
+      if (result.success) {
+        setIsEmailSent(true);
+        toast.success(`E-ticket berhasil dikirim ke ${user.email}`);
+      } else {
+        throw new Error(result.message || "Gagal mengirim email");
+      }
     } catch (error) {
       console.error("Error sending email:", error);
-      toast.error("Gagal mengirim e-ticket ke email");
+      toast.error(error.message || "Gagal mengirim e-ticket ke email");
+    } finally {
+      setIsEmailSending(false);
     }
   };
 
@@ -263,7 +310,7 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
 
       {/* Action Button */}
       <button
-        onClick={handlePayNow}
+        onClick={handleLoginOrPay}
         disabled={!user}
         className={`w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 ${
           user

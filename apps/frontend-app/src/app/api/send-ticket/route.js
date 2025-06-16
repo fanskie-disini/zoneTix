@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import * as SibApiV3Sdk from "@sendinblue/client";
+import QRCode from "qrcode";
 
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 apiInstance.setApiKey(
@@ -10,27 +11,29 @@ apiInstance.setApiKey(
 );
 
 // Fungsi untuk generate QR Code sebagai base64
-function generateQRCodeDataURL(text, size = 200) {
-  // Implementasi sederhana QR code pattern untuk demo
-  // Dalam produksi, gunakan library QR code yang proper
-  const canvas = {
-    width: size,
-    height: size,
-    toDataURL: () => {
-      // Simulasi QR code pattern sebagai base64
-      const gridSize = 20;
-      let pattern = "";
-      for (let i = 0; i < gridSize; i++) {
-        for (let j = 0; j < gridSize; j++) {
-          pattern += (i + j + text.length) % 3 === 0 ? "█" : "░";
-        }
-        pattern += "\n";
-      }
-      // Return placeholder base64 untuk QR code
-      return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
-    },
-  };
-  return canvas.toDataURL();
+async function generateQRCodeDataURL(text, options = {}) {
+  try {
+    const qrOptions = {
+      width: options.size || 200,
+      margin: 2,
+      color: {
+        dark: "#000000",
+        light: "#FFFFFF",
+      },
+      errorCorrectionLevel: "M",
+      type: "image/png",
+      quality: 0.92,
+      ...options,
+    };
+
+    // Generate QR code sebagai data URL
+    const qrCodeDataURL = await QRCode.toDataURL(text, qrOptions);
+    return qrCodeDataURL;
+  } catch (error) {
+    console.error("Error generating QR code:", error);
+    // Fallback ke placeholder jika gagal
+    return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  }
 }
 
 export async function POST(request) {
@@ -69,8 +72,17 @@ export async function POST(request) {
       });
     };
 
-    // Generate QR Code untuk e-ticket
-    const qrCodeDataURL = generateQRCodeDataURL(eTicketId);
+    // Generate QR Code untuk e-ticket dengan data yang lebih lengkap
+    const qrData = JSON.stringify({
+      ticketId: eTicketId,
+      orderId: orderId,
+      eventId: event.id || event.title,
+      userEmail: user.email,
+      validatedAt: null,
+      issued: new Date().toISOString(),
+    });
+
+    const qrCodeDataURL = await generateQRCodeDataURL(qrData, { size: 200 });
 
     // Buat daftar tiket dalam HTML
     const ticketListHTML = tickets
@@ -179,13 +191,10 @@ export async function POST(request) {
               <div style="background-color: #ffffff; border: 3px dashed #72BAA9; border-radius: 12px; padding: 25px; text-align: center; margin-bottom: 25px;">
                 <h3 style="color: #474E93; margin: 0 0 20px 0; font-size: 20px;">🎫 E-TICKET QR CODE</h3>
                 
-                <!-- QR Code Placeholder -->
+                <!-- QR Code -->
                 <div style="background-color: #f8f9fc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                  <div style="width: 200px; height: 200px; margin: 0 auto; background-color: #000; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
-                    <div style="color: white; font-family: monospace; font-size: 8px; line-height: 1; text-align: center; word-break: break-all;">
-                      ${eTicketId}
-                    </div>
-                  </div>
+                  <img src="${qrCodeDataURL}" alt="QR Code E-Ticket" style="width: 200px; height: 200px; border-radius: 8px; display: block; margin: 0 auto;" />
+                  <p style="margin: 10px 0 0 0; font-size: 12px; color: #666; font-family: monospace;">ID: ${eTicketId}</p>
                 </div>
 
                 <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
@@ -244,27 +253,33 @@ export async function POST(request) {
     const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.to = [{ email: trimmedEmail, name: user.name }];
     sendSmtpEmail.sender = {
-      email: process.env.EMAIL_SENDER_ADDRESS,
-      name: process.env.EMAIL_SENDER_NAME,
+      email: process.env.EMAIL_SENDER_ADDRESS || "noreply@zonetix.com",
+      name: process.env.EMAIL_SENDER_NAME || "zoneTix",
     };
     sendSmtpEmail.subject = `E-Ticket zoneTix - ${event.title} [${eTicketId}]`;
     sendSmtpEmail.htmlContent = htmlContent;
 
-    // Optional: Tambahkan attachment PDF jika diperlukan
-    // sendSmtpEmail.attachment = [{ ... }];
+    // Kirim email
+    const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
 
-    await apiInstance.sendTransacEmail(sendSmtpEmail);
-
-    // Optional: Simpan log pengiriman e-ticket ke database
+    // Simpan log pengiriman e-ticket ke database
     try {
-      await supabase.from("ticket_emails").insert({
-        order_id: orderId,
-        eticket_id: eTicketId,
-        email: trimmedEmail,
-        sent_at: new Date().toISOString(),
-        event_title: event.title,
-        total_amount: total,
-      });
+      const { data: logData, error: logError } = await supabase
+        .from("ticket_emails")
+        .insert({
+          order_id: orderId,
+          eticket_id: eTicketId,
+          email: trimmedEmail,
+          sent_at: new Date().toISOString(),
+          event_title: event.title,
+          total_amount: total,
+          brevo_message_id: result.body?.messageId || null,
+          status: "sent",
+        });
+
+      if (logError) {
+        console.warn("Warning: Failed to log email sending:", logError);
+      }
     } catch (logError) {
       console.warn("Warning: Failed to log email sending:", logError);
       // Tidak perlu menggagalkan proses jika logging gagal
@@ -278,6 +293,7 @@ export async function POST(request) {
         eTicketId,
         sentTo: trimmedEmail,
         sentAt: new Date().toISOString(),
+        messageId: result.body?.messageId || null,
       },
     });
   } catch (error) {
@@ -286,15 +302,28 @@ export async function POST(request) {
     // Handle specific Brevo API errors
     if (error.response) {
       const errorMessage =
-        error.response.body?.message || "Gagal mengirim email";
+        error.response.body?.message ||
+        error.response.text ||
+        "Gagal mengirim email";
+      const statusCode = error.response.status || 500;
+
       return NextResponse.json(
-        { success: false, message: `Email error: ${errorMessage}` },
-        { status: 500 }
+        {
+          success: false,
+          message: `Email error: ${errorMessage}`,
+          errorCode: statusCode,
+        },
+        { status: statusCode }
       );
     }
 
+    // Handle network atau error lainnya
     return NextResponse.json(
-      { success: false, message: "Gagal mengirim e-ticket ke email" },
+      {
+        success: false,
+        message: "Gagal mengirim e-ticket ke email",
+        error: error.message,
+      },
       { status: 500 }
     );
   }
