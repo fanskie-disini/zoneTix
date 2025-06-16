@@ -1,4 +1,4 @@
-// src/app/eticket/[id]/page.jsx
+// src/app/eticket/[id]/page.jsx - Enhanced Version
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,57 +18,22 @@ export default function ETicketPage() {
   useEffect(() => {
     if (id) {
       try {
-        // Simulasi data jika tidak ada localStorage (untuk testing)
         let storedTickets = {};
         
-        // Coba ambil dari localStorage jika tersedia
+        // Coba ambil dari localStorage
         if (typeof window !== 'undefined' && window.localStorage) {
-          storedTickets = JSON.parse(localStorage.getItem('etickets') || '{}');
+          const stored = localStorage.getItem('etickets');
+          if (stored) {
+            storedTickets = JSON.parse(stored);
+          }
         }
         
-        // Jika data tidak ditemukan, buat data simulasi untuk demo
-        if (!storedTickets[id]) {
-          const mockTicketData = {
-            id: id,
-            orderId: `ORD-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-            event: {
-              title: "Festival Musik Nusantara 2025",
-              date: "2025-07-15T19:00:00.000Z",
-              location: "Jakarta International Expo, Kemayoran"
-            },
-            tickets: [
-              {
-                name: "VIP Ticket",
-                price: 500000,
-                quantity: 2,
-                subtotal: 1000000
-              },
-              {
-                name: "Regular Ticket", 
-                price: 250000,
-                quantity: 1,
-                subtotal: 250000
-              }
-            ],
-            total: 1250000,
-            user: {
-              name: "John Doe",
-              email: "john.doe@email.com",
-              phone: "+62 812-3456-7890"
-            },
-            purchaseDate: "2025-06-15T10:30:00.000Z",
-            status: "confirmed"
-          };
-          
-          // Jika ada localStorage, simpan data mock
-          if (typeof window !== 'undefined' && window.localStorage) {
-            storedTickets[id] = mockTicketData;
-            localStorage.setItem('etickets', JSON.stringify(storedTickets));
-          }
-          
-          setTicketData(mockTicketData);
-        } else {
+        // Cek apakah data untuk ID ini ada
+        if (storedTickets[id]) {
           setTicketData(storedTickets[id]);
+        } else {
+          // Jika tidak ada data, tampilkan error
+          setError('E-ticket tidak ditemukan. Pastikan Anda telah menyelesaikan pembelian tiket.');
         }
       } catch (err) {
         console.error('Error loading ticket data:', err);
@@ -76,34 +41,21 @@ export default function ETicketPage() {
       } finally {
         setLoading(false);
       }
+    } else {
+      setError('ID e-ticket tidak valid');
+      setLoading(false);
     }
   }, [id]);
 
-  // Generate QR code pattern berdasarkan ticket ID
-  const generateQRCode = (text, size = 200) => {
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-
-    const gridSize = 20;
-    const cellSize = size / gridSize;
-
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, size, size);
-
-    ctx.fillStyle = "#FFFFFF";
-    // Menggunakan hash dari text untuk pattern yang konsisten
-    for (let i = 0; i < gridSize; i++) {
-      for (let j = 0; j < gridSize; j++) {
-        const hash = (i * gridSize + j + text.length) % 7;
-        if (hash < 3) {
-          ctx.fillRect(i * cellSize, j * cellSize, cellSize, cellSize);
-        }
-      }
+  // Generate consistent QR code pattern berdasarkan ticket ID
+  const generateQRPattern = (text, gridSize = 12) => {
+    const pattern = [];
+    for (let i = 0; i < gridSize * gridSize; i++) {
+      // Create deterministic pattern based on text and position
+      const hash = (text.charCodeAt(i % text.length) + i) % 7;
+      pattern.push(hash < 3);
     }
-
-    return canvas.toDataURL();
+    return pattern;
   };
 
   const downloadPDF = async () => {
@@ -114,12 +66,12 @@ export default function ETicketPage() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
 
-      // Colors
+      // Colors matching the design
       const primaryColor = [71, 78, 147]; // #474E93
       const secondaryColor = [114, 186, 169]; // #72BAA9
       const accentColor = [126, 92, 173]; // #7E5CAD
 
-      // Header
+      // Header with gradient effect
       doc.setFillColor(...primaryColor);
       doc.rect(0, 0, pageWidth, 40, "F");
 
@@ -137,8 +89,18 @@ export default function ETicketPage() {
       // Event Details
       doc.setFontSize(12);
       doc.setFont("helvetica", "normal");
-      doc.text(`Tanggal: ${formatDateTime(ticketData?.event?.date)}`, 20, 75);
-      doc.text(`Lokasi: ${ticketData?.event?.location}`, 20, 87);
+      const eventDate = ticketData?.event?.date ? 
+        new Date(ticketData.event.date).toLocaleDateString('id-ID', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }) : 'Tanggal Event';
+      
+      doc.text(`Tanggal: ${eventDate}`, 20, 75);
+      doc.text(`Lokasi: ${ticketData?.event?.location || 'Lokasi Event'}`, 20, 87);
 
       // Ticket Details Box
       doc.setFillColor(248, 249, 252);
@@ -154,20 +116,23 @@ export default function ETicketPage() {
       let yPos = 125;
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      ticketData?.tickets?.forEach((ticket) => {
-        doc.text(
-          `${ticket.name} x${ticket.quantity} - Rp. ${ticket.subtotal.toLocaleString()}`,
-          25,
-          yPos
-        );
-        yPos += 10;
-      });
+      
+      if (ticketData?.tickets) {
+        ticketData.tickets.forEach((ticket) => {
+          doc.text(
+            `${ticket.name} x${ticket.quantity} - Rp. ${ticket.subtotal?.toLocaleString() || '0'}`,
+            25,
+            yPos
+          );
+          yPos += 10;
+        });
+      }
 
       // Total
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...accentColor);
-      doc.text(`TOTAL: Rp. ${ticketData?.total?.toLocaleString()}`, 25, yPos + 5);
+      doc.text(`TOTAL: Rp. ${ticketData?.total?.toLocaleString() || '0'}`, 25, yPos + 5);
 
       // Order Information
       yPos += 25;
@@ -178,20 +143,23 @@ export default function ETicketPage() {
 
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text(`ID Pesanan: ${ticketData?.orderId}`, 20, yPos + 15);
-      doc.text(`ID E-Ticket: ${ticketData?.id}`, 20, yPos + 27);
-      doc.text(`Nama Pemesan: ${ticketData?.user?.name}`, 20, yPos + 39);
-      doc.text(`Email: ${ticketData?.user?.email}`, 20, yPos + 51);
-      doc.text(`Telepon: ${ticketData?.user?.phone}`, 20, yPos + 63);
+      doc.text(`ID Pesanan: ${ticketData?.orderId || 'N/A'}`, 20, yPos + 15);
+      doc.text(`ID E-Ticket: ${ticketData?.id || id}`, 20, yPos + 27);
+      doc.text(`Nama Pemesan: ${ticketData?.user?.name || 'N/A'}`, 20, yPos + 39);
+      doc.text(`Email: ${ticketData?.user?.email || 'N/A'}`, 20, yPos + 51);
+      doc.text(`Telepon: ${ticketData?.user?.phone || 'N/A'}`, 20, yPos + 63);
 
-      // QR Code
-      const qrCode = generateQRCode(ticketData?.id || '');
-      doc.addImage(qrCode, "PNG", pageWidth - 80, yPos + 10, 60, 60);
-
+      // QR Code placeholder
+      doc.setFillColor(0, 0, 0);
+      doc.rect(pageWidth - 80, yPos + 10, 60, 60, "F");
+      doc.setTextColor(255, 255, 255);
       doc.setFontSize(8);
-      doc.text("Scan QR Code saat masuk event", pageWidth - 80, yPos + 80, {
-        align: "left",
-      });
+      doc.text("QR CODE", pageWidth - 50, yPos + 40, { align: "center" });
+      doc.text(ticketData?.id || id, pageWidth - 50, yPos + 50, { align: "center" });
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(8);
+      doc.text("Scan QR Code saat masuk event", pageWidth - 80, yPos + 80);
 
       // Footer
       doc.setFontSize(8);
@@ -209,7 +177,8 @@ export default function ETicketPage() {
       );
 
       // Save PDF
-      doc.save(`e-ticket-${ticketData?.id}.pdf`);
+      doc.save(`e-ticket-${ticketData?.id || id}.pdf`);
+      alert('E-ticket berhasil diunduh!');
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Gagal mengunduh PDF. Pastikan browser Anda mendukung fitur ini.");
@@ -219,6 +188,7 @@ export default function ETicketPage() {
   };
 
   const formatDateTime = (dateString) => {
+    if (!dateString) return 'Tanggal tidak tersedia';
     try {
       return new Date(dateString).toLocaleDateString('id-ID', {
         weekday: 'long',
@@ -235,8 +205,8 @@ export default function ETicketPage() {
 
   const shareTicket = async () => {
     const shareData = {
-      title: `E-Ticket: ${ticketData.event.title}`,
-      text: `Saya akan menghadiri ${ticketData.event.title} pada ${formatDateTime(ticketData.event.date)}`,
+      title: `E-Ticket: ${ticketData?.event?.title || 'Event'}`,
+      text: `Saya akan menghadiri ${ticketData?.event?.title || 'event ini'} pada ${formatDateTime(ticketData?.event?.date)}`,
       url: window.location.href
     };
 
@@ -250,7 +220,7 @@ export default function ETicketPage() {
       }
     } catch (error) {
       console.error('Error sharing:', error);
-      // Fallback manual copy
+      // Manual fallback
       const textArea = document.createElement('textarea');
       textArea.value = window.location.href;
       document.body.appendChild(textArea);
@@ -288,7 +258,7 @@ export default function ETicketPage() {
               E-Ticket Tidak Ditemukan
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {error || 'ID e-ticket tidak valid atau sudah kedaluwarsa'}
+              {error || 'ID e-ticket tidak valid atau tidak ditemukan'}
             </p>
             <button
               onClick={() => router.push('/')}
@@ -303,8 +273,10 @@ export default function ETicketPage() {
     );
   }
 
+  const qrPattern = generateQRPattern(ticketData.id || id);
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4 mt-20">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-[#474E93] to-[#72BAA9] text-white rounded-t-2xl p-6 text-center">
@@ -330,21 +302,21 @@ export default function ETicketPage() {
           {/* Event Details */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-2xl font-bold text-[#474E93] dark:text-blue-400 mb-4">
-              {ticketData.event.title}
+              {ticketData.event?.title || 'Event Title'}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center text-gray-700 dark:text-gray-300">
-                <Calendar size={18} className="mr-3 text-[#72BAA9]" />
+              <div className="flex items-start text-gray-700 dark:text-gray-300">
+                <Calendar size={18} className="mr-3 text-[#72BAA9] mt-1" />
                 <div>
                   <p className="font-semibold">Tanggal Event</p>
-                  <p className="text-sm">{formatDateTime(ticketData.event.date)}</p>
+                  <p className="text-sm">{formatDateTime(ticketData.event?.date)}</p>
                 </div>
               </div>
-              <div className="flex items-center text-gray-700 dark:text-gray-300">
-                <MapPin size={18} className="mr-3 text-[#72BAA9]" />
+              <div className="flex items-start text-gray-700 dark:text-gray-300">
+                <MapPin size={18} className="mr-3 text-[#72BAA9] mt-1" />
                 <div>
                   <p className="font-semibold">Lokasi</p>
-                  <p className="text-sm">{ticketData.event.location}</p>
+                  <p className="text-sm">{ticketData.event?.location || 'Lokasi Event'}</p>
                 </div>
               </div>
             </div>
@@ -358,20 +330,20 @@ export default function ETicketPage() {
             <div className="inline-block p-4 bg-white border-2 border-dashed border-[#72BAA9] rounded-lg">
               <div className="w-48 h-48 bg-black relative mx-auto">
                 <div className="absolute inset-2 grid grid-cols-12 gap-px">
-                  {Array.from({ length: 144 }).map((_, i) => {
-                    const hash = (i + ticketData.id.length) % 7;
-                    return (
-                      <div
-                        key={i}
-                        className={`${hash < 3 ? "bg-white" : "bg-black"}`}
-                      />
-                    );
-                  })}
+                  {qrPattern.map((isWhite, i) => (
+                    <div
+                      key={i}
+                      className={`${isWhite ? "bg-white" : "bg-black"}`}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
               Scan QR code ini saat masuk event
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+              ID: {ticketData.id}
             </p>
           </div>
 
@@ -381,51 +353,65 @@ export default function ETicketPage() {
               Detail Tiket
             </h3>
             <div className="space-y-3">
-              {ticketData.tickets.map((ticket, index) => (
-                <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">{ticket.name}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Rp. {ticket.price?.toLocaleString()} x {ticket.quantity}
+              {ticketData.tickets && ticketData.tickets.length > 0 ? (
+                ticketData.tickets.map((ticket, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div>
+                      <p className="font-medium text-gray-900 dark:text-white">{ticket.name}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Rp. {ticket.price?.toLocaleString() || '0'} x {ticket.quantity || 1}
+                      </p>
+                    </div>
+                    <p className="font-bold text-[#7E5CAD] dark:text-purple-400">
+                      Rp. {ticket.subtotal?.toLocaleString() || '0'}
                     </p>
                   </div>
-                  <p className="font-bold text-[#7E5CAD] dark:text-purple-400">
-                    Rp. {ticket.subtotal?.toLocaleString()}
-                  </p>
+                ))
+              ) : (
+                <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <p className="text-gray-600 dark:text-gray-400">Detail tiket tidak tersedia</p>
                 </div>
-              ))}
+              )}
               <div className="flex justify-between items-center p-3 bg-[#474E93] text-white rounded-lg">
                 <span className="font-semibold">Total Pembayaran</span>
-                <span className="font-bold text-lg">Rp. {ticketData.total?.toLocaleString()}</span>
+                <span className="font-bold text-lg">Rp. {ticketData.total?.toLocaleString() || '0'}</span>
               </div>
             </div>
           </div>
 
           {/* Customer Info */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-[#474E93] dark:text-blue-400 mb-4">
+            <h3 className="text-lg font-semibold text-[#474E93] dark:text-blue-400 mb-6">
               Informasi Pemesan
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-4">
               <div className="flex items-center text-gray-700 dark:text-gray-300">
-                <User size={18} className="mr-3 text-[#72BAA9]" />
+                <div className="w-10 h-10 bg-[#72BAA9]/10 rounded-lg flex items-center justify-center mr-4">
+                  <User size={20} className="text-[#72BAA9]" />
+                </div>
                 <div>
-                  <p className="font-semibold">Nama</p>
-                  <p className="text-sm">{ticketData.user.name}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">Nama</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{ticketData.user?.name || 'Tidak tersedia'}</p>
                 </div>
               </div>
+              
               <div className="flex items-center text-gray-700 dark:text-gray-300">
-                <Mail size={18} className="mr-3 text-[#72BAA9]" />
+                <div className="w-10 h-10 bg-[#72BAA9]/10 rounded-lg flex items-center justify-center mr-4">
+                  <Mail size={20} className="text-[#72BAA9]" />
+                </div>
                 <div>
-                  <p className="font-semibold">Email</p>
-                  <p className="text-sm">{ticketData.user.email}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">Email</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 break-all">{ticketData.user?.email || 'Tidak tersedia'}</p>
                 </div>
               </div>
+              
               <div className="flex items-center text-gray-700 dark:text-gray-300">
-                <Phone size={18} className="mr-3 text-[#72BAA9]" />
+                <div className="w-10 h-10 bg-[#72BAA9]/10 rounded-lg flex items-center justify-center mr-4">
+                  <Phone size={20} className="text-[#72BAA9]" />
+                </div>
                 <div>
-                  <p className="font-semibold">Telepon</p>
-                  <p className="text-sm">{ticketData.user.phone}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">Telepon</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{ticketData.user?.phone || 'Tidak tersedia'}</p>
                 </div>
               </div>
             </div>
@@ -436,7 +422,7 @@ export default function ETicketPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
               <div>
                 <p><span className="font-semibold">ID E-Ticket:</span> {ticketData.id}</p>
-                <p><span className="font-semibold">ID Pesanan:</span> {ticketData.orderId}</p>
+                <p><span className="font-semibold">ID Pesanan:</span> {ticketData.orderId || 'N/A'}</p>
               </div>
               <div>
                 <p><span className="font-semibold">Tanggal Pembelian:</span> {formatDateTime(ticketData.purchaseDate)}</p>

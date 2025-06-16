@@ -1,7 +1,7 @@
 // src/components/LoadingState.js
 export default function LoadingState() {
   return (
-    <div className="mx-auto max-w-[95%] sm:max-w-3xl md:max-w-4xl lg:max-w-6xl px-2 mt-20">
+    <div className="mx-auto max-w-[95%] sm:max-w-3xl md:max-w-4xl lg:max-w-6xl px-2 mt-23">
       {/* Header Skeleton */}
       <div className="bg-gradient-to-r from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600 rounded-2xl p-8 text-center shadow-lg animate-pulse mb-6">
         <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded-lg mx-auto mb-4 w-64"></div>

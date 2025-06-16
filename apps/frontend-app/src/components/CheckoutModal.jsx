@@ -89,7 +89,57 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
     setCurrentStep("payment");
   };
 
+  // FUNGSI BARU: Simpan data e-ticket ke localStorage
+  const saveTicketToLocalStorage = () => {
+    try {
+      const ticketData = {
+        id: eTicketId,
+        orderId: orderId,
+        event: {
+          title: event?.title || "Event Title",
+          date: event?.date || new Date().toISOString(),
+          location: event?.location || "Event Location"
+        },
+        tickets: selectedTickets.map(ticket => ({
+          name: ticket.name,
+          price: ticket.price,
+          quantity: ticket.quantity,
+          subtotal: ticket.subtotal
+        })),
+        total: total,
+        user: {
+          name: getUserFullName(),
+          email: user?.email || "user@email.com",
+          phone: getUserPhone()
+        },
+        purchaseDate: new Date().toISOString(),
+        status: "confirmed"
+      };
+
+      // Ambil data existing dari localStorage
+      let storedTickets = {};
+      if (typeof window !== 'undefined' && window.localStorage) {
+        storedTickets = JSON.parse(localStorage.getItem('etickets') || '{}');
+      }
+
+      // Tambahkan tiket baru
+      storedTickets[eTicketId] = ticketData;
+
+      // Simpan kembali ke localStorage
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('etickets', JSON.stringify(storedTickets));
+      }
+
+      console.log('Ticket data saved to localStorage:', ticketData);
+    } catch (error) {
+      console.error('Error saving ticket to localStorage:', error);
+    }
+  };
+
   const handlePaymentComplete = () => {
+    // Simpan data ke localStorage sebelum pindah ke step success
+    saveTicketToLocalStorage();
+    
     setCurrentStep("success");
     // Auto send email after payment success
     handleSendEmailTicket();
@@ -103,42 +153,114 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
     onClose();
   };
 
-  // Generate PDF ticket
+  // Generate PDF ticket - UPDATED dengan data yang sama
   const generatePDFTicket = async () => {
     setIsProcessingPDF(true);
     try {
-      // Simulate PDF generation - replace with actual implementation
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Gunakan jsPDF untuk membuat PDF yang sama dengan e-ticket page
+      const jsPDF = (await import("jspdf")).default;
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
 
-      // In real implementation, you would:
-      // 1. Call API to generate PDF
-      // 2. Get PDF blob/URL
-      // 3. Trigger download
+      // Colors
+      const primaryColor = [71, 78, 147]; // #474E93
+      const secondaryColor = [114, 186, 169]; // #72BAA9
+      const accentColor = [126, 92, 173]; // #7E5CAD
 
-      const ticketData = {
-        orderId,
-        eTicketId,
-        event: event,
-        user: {
-          name: getUserFullName(),
-          email: user?.email,
-          phone: getUserPhone(),
-        },
-        tickets: selectedTickets,
-        total,
-        purchaseDate: new Date().toISOString(),
-      };
+      // Header
+      doc.setFillColor(...primaryColor);
+      doc.rect(0, 0, pageWidth, 40, "F");
 
-      // Mock PDF download
-      const element = document.createElement("a");
-      element.href = `data:text/plain;charset=utf-8,${encodeURIComponent(
-        JSON.stringify(ticketData, null, 2)
-      )}`;
-      element.download = `e-ticket-${eTicketId}.txt`;
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont("helvetica", "bold");
+      doc.text("zoneTix E-TICKET", pageWidth / 2, 25, { align: "center" });
 
+      // Event Title
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(18);
+      doc.setFont("helvetica", "bold");
+      doc.text(event?.title || "Event Title", 20, 60);
+
+      // Event Details
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Tanggal: ${event?.date}`, 20, 75);
+      doc.text(`Lokasi: ${event?.location}`, 20, 87);
+
+      // Ticket Details Box
+      doc.setFillColor(248, 249, 252);
+      doc.rect(20, 100, pageWidth - 40, 60, "F");
+      doc.setDrawColor(...primaryColor);
+      doc.rect(20, 100, pageWidth - 40, 60, "D");
+
+      doc.setTextColor(...primaryColor);
+      doc.setFontSize(14);
+      doc.setFont("helvetica", "bold");
+      doc.text("DETAIL TIKET", 25, 115);
+
+      let yPos = 125;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      selectedTickets.forEach((ticket) => {
+        doc.text(
+          `${ticket.name} x${ticket.quantity} - Rp. ${ticket.subtotal.toLocaleString()}`,
+          25,
+          yPos
+        );
+        yPos += 10;
+      });
+
+      // Total
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...accentColor);
+      doc.text(`TOTAL: Rp. ${total.toLocaleString()}`, 25, yPos + 5);
+
+      // Order Information
+      yPos += 25;
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(12);
+      doc.setFont("helvetica", "bold");
+      doc.text("INFORMASI PESANAN", 20, yPos);
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`ID Pesanan: ${orderId}`, 20, yPos + 15);
+      doc.text(`ID E-Ticket: ${eTicketId}`, 20, yPos + 27);
+      doc.text(`Nama Pemesan: ${getUserFullName()}`, 20, yPos + 39);
+      doc.text(`Email: ${user?.email || 'N/A'}`, 20, yPos + 51);
+      doc.text(`Telepon: ${getUserPhone()}`, 20, yPos + 63);
+
+      // QR Code placeholder
+      doc.setFillColor(0, 0, 0);
+      doc.rect(pageWidth - 80, yPos + 10, 60, 60, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.text("QR CODE", pageWidth - 50, yPos + 40, { align: "center" });
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(8);
+      doc.text("Scan QR Code saat masuk event", pageWidth - 80, yPos + 80);
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(128, 128, 128);
+      doc.text(
+        `Dicetak pada: ${new Date().toLocaleString("id-ID")}`,
+        20,
+        pageHeight - 20
+      );
+      doc.text(
+        "zoneTix - Sistem Tiket Digital",
+        pageWidth - 20,
+        pageHeight - 20,
+        { align: "right" }
+      );
+
+      // Save PDF
+      doc.save(`e-ticket-${eTicketId}.pdf`);
       toast.success("E-ticket berhasil diunduh!");
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -148,7 +270,7 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
     }
   };
 
-  // Send email ticket - FIXED VERSION
+  // Send email ticket - UPDATED
   const handleSendEmailTicket = async () => {
     if (!user?.email) {
       toast.error("Email tidak tersedia");
@@ -166,10 +288,10 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
         orderId,
         eTicketId,
         event: {
-          id: event.id,
-          title: event.title,
-          date: event.date,
-          location: event.location,
+          id: event?.id,
+          title: event?.title,
+          date: event?.date,
+          location: event?.location,
         },
         user: {
           name: getUserFullName(),
@@ -580,8 +702,8 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
           </p>
         </div>
       </div>
-
-      {/* Close Button */}
+      
+      {/* Close Button - Lanjutan dari Success Step */}
       <button
         onClick={handleClose}
         className="w-full py-3 bg-[#474E93] text-white rounded-xl font-semibold hover:bg-[#3c417d] transition-colors"
@@ -591,9 +713,10 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
     </div>
   );
 
+  // Render berdasarkan step
   return (
-    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {currentStep === "detail" && <DetailStep />}
           {currentStep === "payment" && <PaymentStep />}

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { getAllEvents } from "@/utils/fetchEvents";
 import EventCard from "@/components/EventCard";
 import EventFilters from "@/components/EventFilters";
-import LoadingState from "@/components/LoadingState";
+import LoadingState from "@/components/EventsLoadingState";
 import FloatingButton from "@/components/FloatingButton";
 
 // Constants
@@ -140,7 +140,7 @@ export default function EventPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[95%] sm:max-w-3xl md:max-w-4xl lg:max-w-6xl px-2 mt-20 space-y-6">
+    <div className="mx-auto max-w-[95%] sm:max-w-3xl md:max-w-4xl lg:max-w-6xl px-2 mt-23 space-y-6">
       {/* Page Header */}
       <PageHeader />
 
