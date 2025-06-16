@@ -1,4 +1,4 @@
-// event/create/page.jsx
+// event/create/page.jsx - Update bagian handleSubmit
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -19,8 +19,20 @@ function CreateEventContent() {
   const [description, setDescription] = useState("");
   const [dateType, setDateType] = useState("text");
   const [searchTimeout, setSearchTimeout] = useState(null);
+  const [userId, setUserId] = useState(null);
   const dateRef = useRef(null);
   const [resetKey, setResetKey] = useState(0);
+
+  // Get user ID from auth
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUserId(session.user.id);
+      }
+    };
+    getUser();
+  }, []);
 
   const handleAddTicket = () => {
     setTickets([...tickets, { name: "", price: "" }]);
@@ -144,9 +156,15 @@ function CreateEventContent() {
     }, 200);
   };
 
+  // UPDATED handleSubmit - Kirim ke event_pending
   const handleSubmit = async (e) => {
     e.preventDefault();
   
+    if (!userId) {
+      alert("Anda harus login terlebih dahulu.");
+      return;
+    }
+
     const parsedTickets = tickets.map((ticket) => ({
       name: ticket.name.trim(),
       price: parseInt(ticket.price, 10) || 0,
@@ -189,10 +207,12 @@ function CreateEventContent() {
       imageUrl: uploadedImageUrl,
       description,
       tickets: parsedTickets,
+      organizer_id: userId
     };
   
     try {
-      const res = await fetch("http://localhost:3001/api/events", {
+      // PERUBAHAN: Kirim ke events-pending API (di frontend-admin)
+      const res = await fetch("http://localhost:3000/api/events-pending", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -201,7 +221,7 @@ function CreateEventContent() {
       if (!res.ok) throw new Error("Gagal menyimpan event.");
   
       const result = await res.json();
-      alert("Event berhasil disimpan!");
+      alert("Event berhasil dikirim untuk review! Silakan tunggu persetujuan admin.");
       
       // Reset form
       e.target.reset();
@@ -227,7 +247,7 @@ function CreateEventContent() {
         <div>
           <h2 className="text-xl font-bold text-[#474E93] dark:text-[#D5E7B5]">Punya acara seru?</h2>
           <p className="text-gray-700 dark:text-gray-300">
-            Yuk, daftarkan eventmu sekarang dan biarkan semua orang tahu betapa serunya acara kamu!
+            Event Anda akan direview oleh admin terlebih dahulu sebelum dipublikasikan!
           </p>
         </div>
       </div>
@@ -382,7 +402,7 @@ function CreateEventContent() {
           type="submit"
           className="bg-[#474E93] hover:bg-[#372f80] text-white font-semibold px-6 py-2 rounded transition dark:bg-[#72BAA9] dark:hover:bg-[#5da594]"
         >
-          Simpan Event
+          Kirim untuk Review
         </button>
       </form>
     </div>

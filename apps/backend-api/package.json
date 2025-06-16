@@ -1,13 +1,21 @@
 {
-  "name": "backend-api",
+  "name": "zonetix-backend-api",
   "version": "1.0.0",
-  "description": "",
+  "description": "Backend API for ZoneTix event management system",
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "event",
+    "management",
+    "api",
+    "supabase",
+    "express"
+  ],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.11.0",
