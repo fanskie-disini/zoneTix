@@ -213,7 +213,7 @@ function CreateEventContent() {
 
       // Try multiple API endpoint possibilities
       const possibleEndpoints = [
-        "http://localhost:3000/api/events"
+        "https://zonetix.vercel.app/api/events"
       ];
 
       let response = null;
