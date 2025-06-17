@@ -433,11 +433,10 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
       {/* Action Button */}
       <button
         onClick={handleLoginOrPay}
-        disabled={!user}
         className={`w-full py-3 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2 ${
           user
             ? "bg-[#474E93] hover:bg-[#3c417d] text-white"
-            : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+            : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-400 dark:hover:bg-gray-500"
         }`}
       >
         <CreditCard size={20} />
@@ -715,7 +714,7 @@ const CheckoutModal = ({ show, onClose, total, event, ticketCounts }) => {
 
   // Render berdasarkan step
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           {currentStep === "detail" && <DetailStep />}
