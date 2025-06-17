@@ -14,7 +14,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// GET - Fetch all events
+// GET - Fetch all events (only approved events)
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -75,7 +75,7 @@ export async function GET(request) {
   }
 }
 
-// POST - Create new event
+// POST - Create new event (save to pending tables first)
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -110,72 +110,86 @@ export async function POST(request) {
       }
     }
 
-    // Prepare event data
-    const eventData = {
+    // Prepare pending event data
+    const pendingEventData = {
       title: title.trim(),
       location: location.trim(),
       date: date,
       image_url: body.image_url || null,
       description: description.trim(),
+      status: "pending", // Set initial status as pending
     };
 
-    console.log("Inserting event data:", eventData);
+    console.log("Inserting pending event data:", pendingEventData);
 
-    // Insert event into database using admin client to bypass RLS
-    const { data: eventResult, error: eventError } = await supabaseAdmin
-      .from("events")
-      .insert([eventData])
-      .select()
-      .single();
+    // Insert event into pending_events table using admin client to bypass RLS
+    const { data: pendingEventResult, error: pendingEventError } =
+      await supabaseAdmin
+        .from("pending_events")
+        .insert([pendingEventData])
+        .select()
+        .single();
 
-    if (eventError) {
-      console.error("Event insertion error:", eventError);
+    if (pendingEventError) {
+      console.error("Pending event insertion error:", pendingEventError);
       return NextResponse.json(
-        { error: "Failed to create event", details: eventError.message },
+        {
+          error: "Failed to create pending event",
+          details: pendingEventError.message,
+        },
         { status: 500 }
       );
     }
 
-    console.log("Event created successfully:", eventResult);
+    console.log("Pending event created successfully:", pendingEventResult);
 
-    // Prepare tickets data
-    const ticketsData = tickets.map((ticket) => ({
-      event_id: eventResult.id,
+    // Prepare pending tickets data
+    const pendingTicketsData = tickets.map((ticket) => ({
+      pending_event_id: pendingEventResult.id, // Reference to pending_events table
       name: ticket.name.trim(),
       price: ticket.price,
     }));
 
-    console.log("Inserting tickets data:", ticketsData);
+    console.log("Inserting pending tickets data:", pendingTicketsData);
 
-    // Insert tickets into database using admin client
-    const { data: ticketsResult, error: ticketsError } = await supabaseAdmin
-      .from("tickets")
-      .insert(ticketsData)
-      .select();
+    // Insert tickets into pending_tickets table using admin client
+    const { data: pendingTicketsResult, error: pendingTicketsError } =
+      await supabaseAdmin
+        .from("pending_tickets")
+        .insert(pendingTicketsData)
+        .select();
 
-    if (ticketsError) {
-      console.error("Tickets insertion error:", ticketsError);
+    if (pendingTicketsError) {
+      console.error("Pending tickets insertion error:", pendingTicketsError);
 
-      // If tickets insertion fails, we should clean up the event
-      await supabaseAdmin.from("events").delete().eq("id", eventResult.id);
+      // If tickets insertion fails, we should clean up the pending event
+      await supabaseAdmin
+        .from("pending_events")
+        .delete()
+        .eq("id", pendingEventResult.id);
 
       return NextResponse.json(
-        { error: "Failed to create tickets", details: ticketsError.message },
+        {
+          error: "Failed to create pending tickets",
+          details: pendingTicketsError.message,
+        },
         { status: 500 }
       );
     }
 
-    console.log("Tickets created successfully:", ticketsResult);
+    console.log("Pending tickets created successfully:", pendingTicketsResult);
 
     // Return success response with created data
     return NextResponse.json(
       {
         success: true,
-        message: "Event created successfully",
+        message:
+          "Event submitted for review successfully. It will be published after admin approval.",
         data: {
-          event: eventResult,
-          tickets: ticketsResult,
+          pending_event: pendingEventResult,
+          pending_tickets: pendingTicketsResult,
         },
+        status: "pending_approval",
       },
       { status: 201 }
     );
@@ -188,7 +202,7 @@ export async function POST(request) {
   }
 }
 
-// PUT - Update existing event
+// PUT - Update existing event (only approved events)
 export async function PUT(request) {
   try {
     const body = await request.json();
@@ -283,7 +297,7 @@ export async function PUT(request) {
   }
 }
 
-// DELETE - Delete event
+// DELETE - Delete event (only approved events)
 export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);

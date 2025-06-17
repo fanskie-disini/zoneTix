@@ -2,13 +2,52 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Plus, Trash, Calendar, MapPin } from "lucide-react";
+import { Plus, Trash, Calendar, MapPin, CheckCircle, Clock } from "lucide-react";
 import dynamic from "next/dynamic";
 import UploadFileInput from "@/components/UploadFileInput";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { supabase } from "@/lib/supabase";
 
 const MapSearch = dynamic(() => import("@/components/MapSearch"), { ssr: false });
+
+// Approval Popup Component
+function ApprovalPopup({ isOpen, onClose }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-[#1e1e2e] rounded-xl p-6 max-w-md w-full mx-4 shadow-xl border border-gray-200 dark:border-gray-700">
+        <div className="text-center">
+          <div className="mx-auto flex items-center justify-center w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full mb-4">
+            <Clock className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            Event Berhasil Dibuat!
+          </h3>
+          
+          <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
+            Terima kasih telah mendaftarkan event Anda. Event Anda sedang menunggu persetujuan dari admin dan akan segera ditampilkan setelah disetujui.
+          </p>
+          
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-300">
+              <Clock className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-medium">Menunggu Persetujuan Admin</span>
+            </div>
+          </div>
+          
+          <button
+            onClick={onClose}
+            className="w-full bg-[#474E93] hover:bg-[#372f80] dark:bg-[#72BAA9] dark:hover:bg-[#5da594] text-white font-semibold py-3 px-4 rounded-lg transition-colors"
+          >
+            Mengerti
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function CreateEventContent() {
   const [tickets, setTickets] = useState([{ name: "", price: "" }]);
@@ -20,6 +59,7 @@ function CreateEventContent() {
   const [dateType, setDateType] = useState("text");
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showApprovalPopup, setShowApprovalPopup] = useState(false);
   const dateRef = useRef(null);
   const [resetKey, setResetKey] = useState(0);
 
@@ -253,7 +293,8 @@ function CreateEventContent() {
       const result = await response.json();
       console.log("Success result:", result);
       
-      alert("Event berhasil disimpan!");
+      // Show approval popup instead of alert
+      setShowApprovalPopup(true);
       
       // Reset form
       e.target.reset();
@@ -269,6 +310,10 @@ function CreateEventContent() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleCloseApprovalPopup = () => {
+    setShowApprovalPopup(false);
   };
 
   return (
@@ -441,6 +486,12 @@ function CreateEventContent() {
           {isSubmitting ? "Menyimpan..." : "Simpan Event"}
         </button>
       </form>
+
+      {/* Approval Popup */}
+      <ApprovalPopup 
+        isOpen={showApprovalPopup} 
+        onClose={handleCloseApprovalPopup} 
+      />
     </div>
   );
 }
